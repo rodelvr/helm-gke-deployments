@@ -8,13 +8,13 @@ cluster_name = "gke-cluster"
 machine_type = "n2-standard-4" # Adjust this if wanted
 min_number_of_nodes = 1
 max_number_of_nodes = 3
+log_bucket = "<YOUR LOG BUCKET>" # Make sure to replace this
 
 # Airflow Variables
 postgres_airflow_db_name = "postgres-airflow-db"
 postgres_airflow_db_password = "<KEEP THIS SAFE!>" # Make sure to replace this
 airflow_service_account_name = "airflow-kubernetes"
 airflow_repo_name = "airflow-custom-images"
-airflow_log_bucket = "<YOUR LOG BUCKET>" # Make sure to replace this
 airflow_dags_path = "airflow" # Relative path to parent folder of dags
 airflow_helm_version = "8.8.0"
 scheduler_replicas = 2
@@ -24,7 +24,6 @@ worker_replicas = 2
 postgres_airbyte_db_name = "postgres-airbyte-db"
 postgres_airbyte_db_password = "<KEEP THIS SAFE!>" # Make sure to replace this
 airbyte_service_account_name = "airbyte-kubernetes"
-airbyte_log_bucket = "<YOUR LOG BUCKET>" # Make sure to replace this
 airbyte_helm_version = "0.94.1"
 
 # Hardware variable (https://docs.docker.com/build/building/multi-platform/)
@@ -65,6 +64,12 @@ reserve-static-ip:
 	ADDRESS_NAME=$(address_name) \
 	bash ./gke-cluster/reserve-static-ip.sh
 
+
+# Create bucket
+create-log-bucket:
+	BUCKET=log_bucket \
+	REGION=region \
+	bash ./gke-cluster/create-log-bucket.sh
 
 # ---- AIRFLOW ----
 
@@ -112,7 +117,7 @@ deploy-airflow:
 	SCHEDULER_REPLICAS=scheduler_replicas \
 	WORKER_REPLICAS=worker_replicas \
 	DATABASE_HOST_IP=$(postgres_db_ip) \
-	LOG_BUCKET=airflow_log_bucket \
+	LOG_BUCKET=log_bucket \
 	AIRFLOW_REPO_NAME=airflow_repo_name \
 	CUSTOM_IMAGE_VERSION=$(image_version) \
 	bash ./airflow-helm/scripts/deploy-airflow.sh
@@ -137,7 +142,7 @@ upgrade-airflow:
 	SCHEDULER_REPLICAS=scheduler_replicas \
 	WORKER_REPLICAS=worker_replicas \
 	DATABASE_HOST_IP=$(postgres_db_ip) \
-	LOG_BUCKET=airflow_log_bucket \
+	LOG_BUCKET=log_bucket \
 	AIRFLOW_REPO_NAME=airflow_repo_name \
 	CUSTOM_IMAGE_VERSION=$(image_version) \
 	bash ./airflow-helm/scripts/upgrade-airflow.sh
@@ -151,6 +156,19 @@ port-forward-airflow:
 	bash ./airflow-helm/scripts/port-forward.sh
 
 # ---- AIRBYTE ----
+
+# Create Airbyte service account
+create-airbyte-service-account:
+	PROJECT_ID=project_id \
+	AIRBYTE_SERVICE_ACCOUNT_NAME=airbyte_service_account_name \
+	bash ./airbyte-helm/scripts/create-service-account.sh
+
+
+# Generate service account JSON
+generate-service-account-json:
+	PROJECT_ID=project_id \
+	AIRBYTE_SERVICE_ACCOUNT_NAME=airbyte_service_account_name \
+	bash ./airbyte-helm/scripts/generate-service-account-json.sh
 
 # Create (external) postgres DB for Airbyte
 create-airbyte-db:
@@ -167,7 +185,7 @@ deploy-airbyte:
 	ZONE=zone \
 	AIRBYTE_HELM_VERSION=airbyte_helm_version \
 	SERVICE_ACCOUNT_NAME=airbyte_service_account_name \
-	BUCKET=airbyte_log_bucket \
+	BUCKET=log_bucket \
 	LOAD_BALANCER_IP=$(load_balancer_ip) \
   	DATABASE_HOST=$(postgres_db_ip) \
   	bash ./airbyte-helm/scripts/deploy-airbyte.sh
@@ -180,7 +198,7 @@ upgrade-airbyte:
 	ZONE=zone \
 	AIRBYTE_HELM_VERSION=airbyte_helm_version \
 	SERVICE_ACCOUNT_NAME=airbyte_service_account_name \
-	BUCKET=airbyte_log_bucket \
+	BUCKET=log_bucket \
 	LOAD_BALANCER_IP=$(load_balancer_ip) \
   	DATABASE_HOST=$(postgres_db_ip) \
   	bash ./airbyte-helm/scripts/deploy-airbyte.sh
