@@ -1,0 +1,446 @@
+########################################
+## CONFIG | Airflow Configs
+########################################
+airflow:
+  ## if we use legacy 1.10 airflow commands
+  legacyCommands: false
+
+  ## configs for the airflow container image
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
+  image:
+#    repository: europe-west1-docker.pkg.dev/<PROJECT_ID>/airflow-custom-images/airflow-custom
+#    tag: 0.1
+    pullPolicy: IfNotPresent
+
+  ## the airflow executor type to use
+  executor: CeleryExecutor
+
+  ## the fernet encryption key
+  ## [NOTE] we have set `AIRFLOW__CORE__FERNET_KEY` from a Secret using `airflow.extraEnv`
+  fernetKey: ""
+
+  ## the secret_key for flask
+  ## [NOTE] we have set `AIRFLOW__WEBSERVER__SECRET_KEY` from a Secret using `airflow.extraEnv`
+  webserverSecretKey: ""
+
+  ## environment variables for airflow configs
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-configs.md
+  config:
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+
+    ## remote log storage
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
+#    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: "gs://airflow_beta_bucket/airflow/logs"
+    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: "my_gcp"
+
+    ## plugins
+    AIRFLOW__CORE__PLUGINS_FOLDER: "/var/airflow/plugins"
+
+#    ## domain used in airflow emails
+#    AIRFLOW__WEBSERVER__BASE_URL: "https://airflow-cluster1.example.com/"
+
+  ## a list of users to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/airflow-users.md
+  users: []
+
+  ## a list airflow connections to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-connections.md
+  connections:
+    - id: my_gcp
+      type: google_cloud_platform
+      description: my GCP connection
+      extra: |
+        {
+          "extra__google_cloud_platform__num_retries": 5
+        }
+
+  ## a list airflow variables to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
+#  variables:
+#    - key: "environment"
+#      value: "test"
+
+  ## a list airflow pools to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md
+  pools:
+    - name: "pool_1"
+      slots: 5
+      description: "example pool with 5 slots"
+    - name: "pool_2"
+      slots: 10
+      description: "example pool with 10 slots"
+
+  ## extra pip packages to install in airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/extra-python-packages.md
+  ## [WARNING] this feature is not recommended for production use, see docs
+  extraPipPackages: []
+
+  ## extra environment variables for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-environment-variables.md
+  extraEnv:
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/set-fernet-key.md
+    - name: AIRFLOW__CORE__FERNET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airflow-cluster-fernet-key
+          key: value
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/set-webserver-secret-key.md
+    - name: AIRFLOW__WEBSERVER__SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airflow-cluster-webserver-key
+          key: value
+    - name: PROJECT_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: airflow-cluster-project-variables
+          key: project_name
+    - name: LOCATION
+      valueFrom:
+        configMapKeyRef:
+          name: airflow-cluster-project-variables
+          key: location
+    - name: AIRFLOW__WEBSERVER__NAVBAR_COLOR
+      valueFrom:
+        configMapKeyRef:
+          name: airflow-cluster-project-variables
+          key: navbar_color
+    - name: BUCKET
+      valueFrom:
+        configMapKeyRef:
+          name: airflow-cluster-project-variables
+          key: bucket
+
+  ## extra VolumeMounts for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+  extraVolumeMounts: []
+
+  ## extra Volumes for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+  extraVolumes: []
+
+###################################
+## COMPONENT | Airflow Scheduler
+###################################
+scheduler:
+  ## the number of scheduler Pods to run
+#  replicas: 1
+
+  ## resource requests/limits for the scheduler Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+
+  ## configs for the log-cleanup sidecar of the scheduler
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/log-cleanup.md
+  logCleanup:
+    enabled: true
+    retentionMinutes: 21600
+
+    ## resource requests/limits for the log-cleanup container
+    ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+
+  ## configs for the scheduler Pods' liveness probe
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/scheduler-liveness-probe.md
+  livenessProbe:
+    enabled: true
+
+    ## configs for an additional check that ensures tasks are being created by the scheduler
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/scheduler-liveness-probe.md
+    taskCreationCheck:
+      enabled: false
+      thresholdSeconds: 300
+      schedulerAgeBeforeCheck: 180
+
+###################################
+## COMPONENT | Airflow Webserver
+###################################
+web:
+  ## the number of web Pods to run
+#  replicas: 1
+
+  ## resource requests/limits for the web Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "900Mi"
+
+  ## configs for the Service of the web Pods
+  service:
+    type: LoadBalancer
+    externalPort: 443
+    loadBalancerSourceRanges: []
+    annotations:
+      cloud.google.com/load-balancer-type: "Internal"
+
+  ## configs generating the `webserver_config.py` file
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-configs.md#webserver_configpy
+  webserverConfig:
+    ## the full content of the `webserver_config.py` file (as a string)
+    stringOverride: |
+      from airflow import configuration as conf
+      from flask_appbuilder.security.manager import AUTH_DB
+      
+      # the SQLAlchemy connection string
+      SQLALCHEMY_DATABASE_URI = conf.get("core", "SQL_ALCHEMY_CONN")
+      
+      # use embedded DB for auth
+      AUTH_TYPE = AUTH_DB
+
+    ## the name of a Secret containing a `webserver_config.py` key
+    existingSecret: ""
+
+#  ## extra VolumeMounts for the web Pods
+#  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+#  extraVolumeMounts:
+#    - name: ssl-cert
+#      mountPath: /opt/airflow/ssl-cert
+#      readOnly: true
+#
+#  ## extra Volumes for the web Pods
+#  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+#  extraVolumes:
+#    - name: ssl-cert
+#      secret:
+#        secretName: airflow-cluster1-cert
+
+###################################
+## COMPONENT | Airflow Workers
+###################################
+workers:
+  ## if the airflow workers StatefulSet should be deployed
+  enabled: true
+
+  ## the number of worker Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the worker Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "2Gi"
+
+  ## configs for the PodDisruptionBudget of the worker StatefulSet
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: "20%"
+
+  ## configs for the log-cleanup sidecar of the worker Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/log-cleanup.md
+  logCleanup:
+    enabled: true
+    retentionMinutes: 21600
+
+    ## resource requests/limits for the log-cleanup container
+    ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+
+###################################
+## COMPONENT | Triggerer
+###################################
+triggerer:
+  ## if the airflow triggerer should be deployed
+  enabled: true
+
+  ## the number of triggerer Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the triggerer Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "2Gi"
+
+  ## maximum number of triggers each triggerer will run at once (sets `AIRFLOW__TRIGGERER__DEFAULT_CAPACITY`)
+  capacity: 1000
+
+###################################
+## COMPONENT | Flower
+###################################
+flower:
+  ## if the airflow flower UI should be deployed
+  enabled: true
+
+  ## the number of flower Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the flower Pod
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+  resources:
+    requests:
+      cpu: "10m"
+      memory: "64Mi"
+
+  ## configs for the Service of the flower Pods
+  service:
+    type: ClusterIP
+    externalPort: 5555
+
+###################################
+## CONFIG | Airflow Logs
+###################################
+logs:
+  ## the airflow logs folder
+  path: /opt/airflow/logs
+
+  ## configs for the logs PVC
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/log-persistence.md
+  persistence:
+    enabled: false
+
+###################################
+## CONFIG | Airflow DAGs
+###################################
+dags:
+  ## the airflow dags folder
+  path: /var/airflow/dags
+
+  ## configs for the dags PVC
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/load-dag-definitions.md
+  persistence:
+    enabled: true
+    existingClaim: airflow-dags-pvc
+    accessMode: ReadOnlyMany
+    mountPath: /var/airflow/dags
+
+###################################
+## CONFIG | Kubernetes Ingress
+###################################
+ingress:
+  ## if we should deploy Ingress resources
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/ingress.md
+  enabled: false
+
+###################################
+## CONFIG | Kubernetes ServiceAccount
+###################################
+serviceAccount:
+  ## if a Kubernetes ServiceAccount is created
+  create: true
+
+  ## the name of the ServiceAccount
+  name: "airflow"
+
+  ## annotations for the ServiceAccount
+  annotations:
+    iam.gke.io/gcp-service-account: "airflow-kubernetes@<PROJECT_ID>.iam.gserviceaccount.com"
+
+###################################
+## CONFIG | Kubernetes Extra Manifests
+###################################
+
+## a list of extra Kubernetes manifests that will be deployed alongside the chart
+## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/extra-manifests.md
+extraManifests: []
+
+###################################
+## DATABASE | PgBouncer
+###################################
+pgbouncer:
+  ## if the pgbouncer Deployment is created
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/pgbouncer.md
+  enabled: false
+
+###################################
+## DATABASE | Embedded Postgres
+###################################
+postgresql:
+  ## if the `stable/postgresql` chart is used
+  enabled: false
+
+###################################
+## DATABASE | External Database
+###################################
+externalDatabase:
+  ## the type of external database
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/external-database.md
+  type: postgres
+
+  ## the address of the external database
+#  host: 10.132.0.1
+  port: 5432
+
+  ## the database which will contain the airflow tables
+  database: airflow
+
+  ## the name of a pre-created secret containing the external database user
+  userSecret: "airflow-cluster-postgres-credentials"
+  userSecretKey: "username"
+
+  ## the name of a pre-created secret containing the external database password
+  passwordSecret: "airflow-cluster-postgres-credentials"
+  passwordSecretKey: "password"
+
+  ## use this for any extra connection-string settings, e.g. ?useSSL=false
+  properties: ""
+
+###################################
+## DATABASE | Embedded Redis
+###################################
+redis:
+  ## if the `stable/redis` chart is used
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/embedded-redis.md
+  ## [WARNING] consider using an external database with `externalDatabase.*`
+  enabled: true
+
+  ## the name of a pre-created secret containing the redis password
+  existingSecret: "airflow-cluster-redis-password"
+  existingSecretPasswordKey: "redis-password"
+
+  ## configs for redis cluster mode
+  cluster:
+    enabled: false
+    slaveCount: 1
+
+  ## configs for the redis master StatefulSet
+  master:
+    ## resource requests/limits for the redis master Pods
+    ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+
+    ## configs for the PVC of the redis master Pods
+    persistence:
+      enabled: false
+      storageClass: ""
+      size: 8Gi
+
+  ## configs for the redis slave StatefulSet
+  slave:
+    ## resource requests/limits for the slave Pods
+    ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcerequirements-v1-core
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+
+    ## configs for the PVC of the redis slave Pods
+    persistence:
+      enabled: false
+      storageClass: ""
+      size: 8Gi
+
+###################################
+## DATABASE | External Redis
+###################################
+externalRedis:
+  ## the host of the external redis
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/external-redis.md
+  host: localhost

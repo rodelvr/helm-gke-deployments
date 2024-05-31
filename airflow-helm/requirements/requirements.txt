@@ -1,0 +1,1 @@
+apache-airflow[async,google,slack,http,postgres,pagerduty,airbyte]
