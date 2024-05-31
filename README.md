@@ -14,6 +14,7 @@ The following is required to get started:
   - By using [choco](https://chocolatey.org/install) (`choco install make`) on Windows 
   - [Homebrew](https://docs.brew.sh/Installation) on MacOS (`brew install make`)
 - An existing Google Cloud Platform (GCP) project.
+- `kubectl` installed.
 - (Airflow only) Docker installed (e.g. Docker desktop)
 - Multiple IAM roles in your GCP project:
   - GKE Admin permissions (`roles/container.admin`)
